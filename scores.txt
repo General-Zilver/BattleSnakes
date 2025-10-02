@@ -1,0 +1,11 @@
+John 100
+Alex 10
+Bob 8
+Alice 6
+Kevin 7
+Jose 7
+Robert 3
+Dummy 0
+Dummy2 1
+Dummy3 5
+Guest 4

@@ -1,0 +1,228 @@
+main.py
+
+def show_scores_gui(screen):
+    screen.fill(BLACK)
+
+    scores = []
+    if os.path.exists(SCORES_FILE):
+        with open(SCORES_FILE) as f:
+            for line in f:
+                parts = line.strip().rsplit(" ", 1)  # Split on last space
+                if len(parts) == 2 and parts[1].isdigit():
+                    username, score = parts
+                    scores.append((username, int(score)))
+    if not scores:
+        lines = ["No scores yet."]
+    else:
+        # Sort by score descending
+        scores.sort(key=lambda x: x[1], reverse=True)
+        lines = scores[:10]
+
+    # Title
+    screen.blit(BIG_FONT.render("------Scores------", True, WHITE), (50, 10))
+    screen.blit(FONT.render("Players", True, WHITE), (50, 50))
+    screen.blit(FONT.render("-----------", True, WHITE), (50, 60))
+    screen.blit(FONT.render("Score", True, WHITE), (300, 50))
+    screen.blit(FONT.render("---------", True, WHITE), (300, 60))
+
+    #Controls the starting vertical position of each line of text
+    y = 90
+    for name, score in lines:
+        name_txt = FONT.render(name, True, WHITE)
+        score_txt = FONT.render(str(score), True, WHITE)
+        screen.blit(name_txt, (50, y))    # Left column
+        screen.blit(score_txt, (300, y))  # Right column
+        y += 30
+
+    pygame.display.flip()
+    pygame.time.wait(5000)#keeps the score screen visiblee for 5 seconds
+
+
+BaseGame.py
+
+
+class BaseGame:
+    def __init__(self, settings: dict, user: str = "Player 1"):
+        self.rows, self.cols = settings["rows"], settings["cols"]
+        self.snakes_each = settings.get("snakes_per_player", 7)
+        self.players = [Player(user), Player("Bot")]
+        self.turn_idx = 0
+        self.turns_taken = 0
+        self.phase = "placement"
+        self.over = False
+        self.last_hit_message = None
+        self.hit_timer = 0
+        self.force_redraw = False
+        self.bot_last_guess = None
+        pygame.init()
+        self.font = pygame.font.SysFont(None, 22)
+        #################################################
+        original_logo = pygame.image.load(LOGO_IMG)
+        self.logo = pygame.transform.smoothscale(original_logo, (600, int(original_logo.get_height() * 600 / original_logo.get_width())))
+        #################################################
+        self.grass = pygame.transform.scale(pygame.image.load(GRASS_IMG), (CELL, CELL))
+        self.bot_attack_pending = False
+        self.bot_attack_timer = 0
+        self.snake_sprites: dict[str, pygame.Surface] = {}
+        self._prepare_snake_sprites()
+        self.bot_last_hit_message = None
+
+        # Get logo size
+        logo_width = self.logo.get_width()
+        logo_height = self.logo.get_height()
+
+        board_w = self.cols * CELL
+        board_h = self.rows * CELL
+
+        self.left_x = logo_width + GAP
+
+        # Adjust gap between top and bottom board
+        gap_between_boards = GAP + 50
+
+        window_w = self.left_x + board_w + GAP + RIGHT_W
+        window_h = max(logo_height, board_h * 2 + gap_between_boards)
+
+        self.top_rect = pygame.Rect(self.left_x, 0, board_w, board_h)
+        self.bot_rect = self.top_rect.move(0, board_h + gap_between_boards)
+
+        # Setup screen and center the window manually
+        self.screen = pygame.display.set_mode((window_w, window_h))
+        self.screen.fill(WHITE)
+        pygame.display.flip()
+        pygame.display.set_caption("BattleSnakes - The Game")
+
+        # Buttons
+        self.yes_btn = pygame.Rect(0, 0, 120, 40)
+        self.yes_btn.center = (self.left_x + (self.cols * CELL) // 2, self.top_rect.bottom + 30)
+        self.play_again_btn = pygame.Rect(self.left_x + board_w + GAP + 50, 300, 120, 40)
+        self.quit_btn = pygame.Rect(self.left_x + board_w + GAP + 50, 360, 120, 40)
+        ############
+        self.main_menu_btn = pygame.Rect(self.left_x + board_w + GAP + 50, 420, 120, 40)
+        ############
+
+        self.pending: Coord | None = None
+        self.messages: List[str] = ["Place your snakes: click bottom grid"]
+        self._grass_cache = {}
+
+
+    def draw_panel(self):
+        # Right-side panel background
+        panel_x = self.left_x + self.cols * CELL + GAP
+        panel_rect = pygame.Rect(panel_x, 0, RIGHT_W, self.bot_rect.bottom)
+        pygame.draw.rect(self.screen, PANEL_BG, panel_rect)
+
+        # Render last few messages
+        y_offset = 20
+        for line in self.messages[-8:]:
+            msg_surface = self.font.render(line, True, BLACK)
+            self.screen.blit(msg_surface, (panel_x + 10, y_offset))
+            y_offset += 24
+
+        # Center button area or placement message
+        if self.phase == "placement":
+            self.show_snakes_left_message()
+        elif self.pending and self.phase == "battle" and self.turn_idx == 0:
+            pygame.draw.rect(self.screen, GREEN_BTN, self.yes_btn)
+            label = self.font.render("Attack Here?", True, WHITE)
+            self.screen.blit(label, label.get_rect(center=self.yes_btn.center))
+        ################
+        # Always show Quit button
+        pygame.draw.rect(self.screen, RED, self.quit_btn)
+        quit_text = self.font.render("Quit", True, WHITE)
+        self.screen.blit(quit_text, quit_text.get_rect(center=self.quit_btn.center))
+
+        # Always show Main Menu button
+        pygame.draw.rect(self.screen, GRAY, self.main_menu_btn)
+        main_menu_text = self.font.render("Main Menu", True, WHITE)
+        self.screen.blit(main_menu_text, main_menu_text.get_rect(center=self.main_menu_btn.center))
+        #####################
+
+    def draw_end_buttons(self):
+        # Play Again and Quit buttons
+        pygame.draw.rect(self.screen, GREEN_BTN, self.play_again_btn)
+        pygame.draw.rect(self.screen, RED, self.quit_btn)
+        ############
+        pygame.draw.rect(self.screen, GRAY, self.main_menu_btn)
+        ##############
+        again_text = self.font.render("Play Again", True, WHITE)
+        quit_text = self.font.render("Quit", True, WHITE)
+        ###########
+        menu_text = self.font.render("Main Menu", True, WHITE)
+        ###########
+        self.screen.blit(again_text, again_text.get_rect(center=self.play_again_btn.center))
+        self.screen.blit(quit_text, quit_text.get_rect(center=self.quit_btn.center))
+        ###########
+        self.screen.blit(menu_text, menu_text.get_rect(center=self.main_menu_btn.center))
+        ###########
+        # Centered Win/Lose Message (where "Attack Here?" normally is)
+        if hasattr(self, "end_winner"):
+            big_font = pygame.font.SysFont(None, 48)
+            if self.end_winner == "Player":
+                result_text = big_font.render("You Win!", True, (0, 180, 0))
+            else:
+                result_text = big_font.render("Bot Wins!", True, (200, 0, 0))
+
+            # Use the same center as yes_btn
+            self.screen.blit(result_text, result_text.get_rect(center=self.yes_btn.center))
+
+   def play(self):
+        clock = pygame.time.Clock()
+        running = True
+        while running:
+            self.draw()
+
+            ###############################
+            if self.over and not hasattr(self, "score_saved"):
+                from score_manager import update_score
+                update_score(self.user.name, len(self.user.hits))
+                self.score_saved = True
+            ###############################
+
+            if self.force_redraw:
+                self.force_redraw = False  # reset flag
+
+            # Handle delayed bot attack
+            if self.bot_attack_pending and pygame.time.get_ticks() - self.bot_attack_timer >= 1000:
+                self.bot_take_shot()
+                self.check_game_over()
+                if not self.over:
+                    self.snakes_move_phase()
+                    self.turns_taken += 1
+                self.bot_attack_pending = False
+
+            pygame.display.flip()
+
+            for e in pygame.event.get():
+                if e.type == pygame.QUIT:
+                    running = False
+
+                elif e.type == pygame.MOUSEBUTTONDOWN and e.button == 1:
+                    if self.quit_btn.collidepoint(e.pos):
+                        running = False
+                    elif self.over and self.play_again_btn.collidepoint(e.pos):
+                        self.reset_game()
+                    #################################
+                    elif self.main_menu_btn.collidepoint(e.pos):
+                        pygame.mixer.quit()  # if using sound, clean up
+                        self.over = True     # optional: flag to exit cleanly
+                        from main import run_gui_launcher
+                        run_gui_launcher()
+                        return
+                    #############################
+                    elif self.phase == "placement" and self.bot_rect.collidepoint(e.pos):
+                        gx = (e.pos[0] - self.bot_rect.x) // CELL
+                        gy = (e.pos[1] - self.bot_rect.y) // CELL
+                        self.handle_placement_click(gx, gy)
+
+                    elif self.phase == "battle":
+                        if self.yes_btn.collidepoint(e.pos) and self.pending:
+                            self.confirm_attack()
+                        elif self.top_rect.collidepoint(e.pos):
+                            gx = (e.pos[0] - self.top_rect.x) // CELL
+                            gy = (e.pos[1] - self.top_rect.y) // CELL
+                            self.handle_attack_click(gx, gy)
+
+            clock.tick(30)
+
+        pygame.quit()
+        sys.exit()

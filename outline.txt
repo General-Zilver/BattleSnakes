@@ -1,0 +1,80 @@
+import os
+import random
+import sys
+from typing import List, Set, Tuple, Callable
+os.environ['SDL_VIDEO_CENTERED'] = '1' 
+import pygame
+from customize_board import load_settings
+
+# ─────── constants ────────────────────────────────────────────────────────
+ASSETS = os.path.dirname(os.path.abspath(__file__))
+LOGO_IMG = os.path.join(ASSETS, "battlesnakes_logo.png")
+GRASS_IMG = os.path.join(ASSETS, "grass.png")
+
+CELL = 40
+GAP = 20
+RIGHT_W = 300  # widened panel for text
+SCORES_FILE = "scores.txt"
+
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+GRAY = (170, 170, 170)
+RED = (220, 40, 40)
+GREEN_BTN = (0, 170, 0)
+PANEL_BG = (230, 230, 230)
+
+Coord = Tuple[int, int]
+
+# ─────── model objects ────────────────────────────────────────────────────
+class Snake:
+
+
+class Player:
+
+
+class BaseGame:
+    def __init__(self, settings: dict, user: str = "Player 1"): ###############
+
+    def _prepare_snake_sprites(self):
+
+    def snakes_move_phase(self):
+
+    def handle_placement_click(self, gx: int, gy: int):
+
+    def auto_place_bot(self):
+
+    def handle_attack_click(self, gx: int, gy: int):
+
+    def check_game_over(self):
+
+    def bot_take_shot(self):
+
+    def confirm_attack(self):
+
+    @property
+    def user(self) -> Player:
+        return self.players[0]
+
+    @property
+    def bot(self) -> Player:
+        return self.players[1]
+
+    def draw_grid(self, rect: pygame.Rect):
+
+    def draw_snakes(self, rect: pygame.Rect, owner: Player):
+
+    def draw_panel(self): ##################
+
+    def show_snakes_left_message(self):
+
+    def draw(self):
+
+    def check_game_over(self):
+
+    def show_popup_message(self, text):
+
+    def draw_end_buttons(self):
+
+    def reset_game(self):
+
+    def play(self): ###################
