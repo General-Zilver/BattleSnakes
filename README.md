@@ -12,11 +12,11 @@ Battle Snakes is a turn-based strategy game written in Python, inspired by the c
 - 👨‍💻 Fully coded in Python using core principles of object-oriented programming and modular design.
 - 🗃️ Well-documented code – Clean, readable, and commented for learning and collaboration.
 
-## 🚀 Getting Started
+## Getting Started
+**Requires:** Python 3.10+  
+**Install:** `pip install pygame`  
+**Run:** `python main.py`
 
-### Requirements:
-- Python 3.1
-
-### Run the Game:
-```bash
-python battlesnakes.py
+Notes:
+- Use the GUI launcher to enter a username and pick Easy/Regular/Hard or Customize Board.
+- Top scores are saved to `scores.txt`.
